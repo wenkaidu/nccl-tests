@@ -11,6 +11,8 @@
 #include <libgen.h>
 #include "cuda.h"
 
+//#define DEBUG_PRINT
+
 #if NCCL_MAJOR >= 2
 ncclDataType_t test_types[ncclNumTypes] = {ncclInt8, ncclUint8, ncclInt32, ncclUint32, ncclInt64, ncclUint64, ncclHalf, ncclFloat, ncclDouble};
 const char *test_typenames[ncclNumTypes] = {"int8", "uint8", "int32", "uint32", "int64", "uint64", "half", "float", "double"};
@@ -278,6 +280,8 @@ testResult_t CheckData(struct threadArgs* args, ncclDataType_t type, ncclRedOp_t
   for (int i=0; i<args->nGpus; i++) {
     int device;
     int rank = ((args->proc*args->nThreads + args->thread)*args->nGpus + i);
+    if (rank != root && strcmp(args->collTest->name, "Gather") == 0)
+      continue;
     NCCLCHECK(ncclCommCuDevice(args->comms[i], &device));
     CUDACHECK(cudaSetDevice(device));
     void *data = in_place ? ((void *)((uintptr_t)args->recvbuffs[i] + args->recvInplaceOffset*rank)) : args->recvbuffs[i];

@@ -57,6 +57,8 @@ testResult_t GatherInitData(struct threadArgs* args, ncclDataType_t type, ncclRe
     }
     CUDACHECK(cudaDeviceSynchronize());
   }
+  // We don't support in-place gather
+  args->reportErrors = in_place ? 0 : 1;
   return testSuccess;
 }
 
@@ -64,7 +66,7 @@ void GatherGetBw(size_t count, int typesize, double sec, double* algBw, double* 
   double baseBw = (double)(count * typesize * (nranks - 1)) / 1.0E9 / sec;
 
   *algBw = baseBw;
-  double factor = 1;
+  double factor = ((double)(nranks-1))/((double)(nranks));
   *busBw = baseBw * factor;
 }
 
@@ -76,6 +78,10 @@ testResult_t GatherRunColl(void* sendbuff, void* recvbuff, size_t count, ncclDat
 
   int rank;
   NCCLCHECK(ncclCommUserRank(comm, &rank));
+#if NCCL_MAJOR < 2 || NCCL_MINOR < 7
+  printf("NCCL 2.7 or later is needed for gather. This test was compiled with %d.%d.\n", NCCL_MAJOR, NCCL_MINOR);
+  return testNcclError;
+#else
   NCCLCHECK(ncclGroupStart());
   if (rank == root) {
   for (int r=0; r<nRanks; r++)
@@ -84,6 +90,7 @@ testResult_t GatherRunColl(void* sendbuff, void* recvbuff, size_t count, ncclDat
   NCCLCHECK(ncclSend(sendbuff, count, type, root, comm, stream));
   NCCLCHECK(ncclGroupEnd());
   return testSuccess;
+#endif
 }
 
 struct testColl gatherTest = {
